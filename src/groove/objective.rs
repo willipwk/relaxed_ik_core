@@ -156,12 +156,13 @@ impl ObjectiveTrait for MatchEERotaDoF {
 }
 
 pub struct SelfCollision {
-    pub arm_idx: usize,
+    pub arm_idx_0: usize,
+    pub arm_idx_1: usize,
     pub first_link: usize,
     pub second_link: usize
 }
 impl SelfCollision {
-    pub fn new(arm_idx: usize, first_link: usize, second_link: usize) -> Self {Self{arm_idx, first_link, second_link}}
+    pub fn new(arm_idx_0: usize, arm_idx_1: usize, first_link: usize, second_link: usize) -> Self {Self{arm_idx_0, arm_idx_1, first_link, second_link}}
 }
 impl ObjectiveTrait for SelfCollision {
     fn call(&self, x: &[f64], v: &vars::RelaxedIKVars, frames: &Vec<(Vec<nalgebra::Vector3<f64>>, Vec<nalgebra::UnitQuaternion<f64>>)>) -> f64 {
@@ -174,20 +175,21 @@ impl ObjectiveTrait for SelfCollision {
         let mut x_val: f64 = 0.0;
         let link_radius = 0.05;
 
-        let start_pt_1 = Point3::from(frames[self.arm_idx].0[self.first_link]);
-        let end_pt_1 = Point3::from(frames[self.arm_idx].0[self.first_link+1]);
+        let start_pt_1 = Point3::from(frames[self.arm_idx_0].0[self.first_link]);
+        let end_pt_1 = Point3::from(frames[self.arm_idx_0].0[self.first_link+1]);
         let segment_1 = shape::Segment::new(start_pt_1, end_pt_1);
 
-        let mut start_pt_2 = Point3::from(frames[self.arm_idx].0[self.second_link]);
-        let mut end_pt_2 = Point3::from(frames[self.arm_idx].0[self.second_link+1]);
+        let mut start_pt_2 = Point3::from(frames[self.arm_idx_1].0[self.second_link]);
+        let mut end_pt_2 = Point3::from(frames[self.arm_idx_1].0[self.second_link+1]);
 
         let segment_2 = shape::Segment::new(start_pt_2, end_pt_2);
 
-        let segment_pos = nalgebra::one();
+        let segment_pos = nalgebra::one(); 
+        // pos 1 and pos 2 are transformations, since we use global positions, just pass identity
         // println!("start_pt_1:{} end_pt_1:{}  start_pt_2:{} end_pt_2:{} x: {:?}", start_pt_1, end_pt_1, start_pt_2, end_pt_2, x);
 
         let dis = query::distance(&segment_pos, &segment_1, &segment_pos, &segment_2).unwrap() - 0.05;
-       
+        // println!("dis:{:?}",dis);
         swamp_loss(dis, 0.02, 1.5, 60.0, 0.0001, 30)
     }
 

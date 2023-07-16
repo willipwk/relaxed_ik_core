@@ -23,7 +23,8 @@ impl RelaxedIK {
         println!("RelaxedIK is using below setting file {}", path_to_setting);
 
         let vars = RelaxedIKVars::from_local_settings(path_to_setting);
-        let om = ObjectiveMaster::relaxed_ik(&vars.robot.chain_lengths);
+        let num_dofs = vars.robot.num_dofs;
+        let om = ObjectiveMaster::relaxed_ik(&vars.robot.chain_lengths, num_dofs);
 
         let groove = OptimizationEngineOpen::new(vars.robot.num_dofs.clone());
 

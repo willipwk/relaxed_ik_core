@@ -1,19 +1,21 @@
 use crate::spacetime::arm;
 use nalgebra;
 use urdf_rs;
-
+use std::collections::HashSet;
+pub const MAX_JOINT_CNT: usize = 1024;
 #[derive(Clone, Debug)]
 pub struct Robot {
     pub arms: Vec<arm::Arm>,
     pub num_chains: usize,
     pub num_dofs: usize,
     pub chain_lengths: Vec<usize>,
+    pub chains_def : Vec<Vec<i64>>,
     pub lower_joint_limits: Vec<f64>,
-    pub upper_joint_limits: Vec<f64>
+    pub upper_joint_limits: Vec<f64>,
 }
 
 impl Robot {
-    pub fn from_urdf(urdf: &str, base_links: &[String], ee_links: &[String]) -> Self {
+    pub fn from_urdf(urdf: &str, base_links: &[String], ee_links: &[String], chains_def: Option<&Vec<Vec<i64>>>) -> Self {
         
         // let chain = k::Chain::<f64>::from_urdf_file(urdf_fp).unwrap();
         let description : urdf_rs::Robot = urdf_rs::read_from_string(urdf).unwrap();
@@ -23,9 +25,11 @@ impl Robot {
         let num_chains = base_links.len();
         let mut chain_lengths = Vec::new();
         let mut num_dofs = 0;
+        let mut articulated_joint_names:HashSet<String> = HashSet::new();
 
         let mut lower_joint_limits = Vec::new();
         let mut upper_joint_limits = Vec::new();
+        println!("chains_def: {:?}",chains_def.unwrap());
 
         for i in 0..num_chains {
             let base_link = chain.find_link(base_links[i].as_str()).unwrap();
@@ -37,9 +41,10 @@ impl Robot {
             let disp_offset = nalgebra::Vector3::new(0.0, 0.0, 0.0);
             let mut displacements = Vec::new();
             let mut rot_offsets = Vec::new();
-
+            
             serial_chain.iter().for_each(|node| {
                 let joint = node.joint();
+                
                 match joint.joint_type {
                     k::JointType::Fixed => {
                         joint_types.push("fixed".to_string());
@@ -61,6 +66,7 @@ impl Robot {
                         joint_types.push("revolute".to_string());
                         lower_joint_limits.push(joint.limits.unwrap().min);
                         upper_joint_limits.push(joint.limits.unwrap().max);
+                        articulated_joint_names.insert(joint.name.clone());
                     }
                     k::JointType::Linear { axis } => {
                         if axis[0] == 1.0 {
@@ -79,6 +85,7 @@ impl Robot {
                         joint_types.push("prismatic".to_string());
                         lower_joint_limits.push(joint.limits.unwrap().min);
                         upper_joint_limits.push(joint.limits.unwrap().max);
+                        articulated_joint_names.insert(joint.name.clone());
                     }
                 }
 
@@ -89,19 +96,32 @@ impl Robot {
             rot_offsets.clone(), joint_types.clone());
             arms.push(arm);
             chain_lengths.push(axis_types.len() as usize);
-            num_dofs += axis_types.len();
+            // num_dofs += axis_types.len();
         }
-        // println!("axis types: {:?}", arms[0].axis_types);
-        Robot{arms, num_chains, chain_lengths, num_dofs, lower_joint_limits, upper_joint_limits}
+        num_dofs = articulated_joint_names.len();
+        println!("axis types: {:?}", arms[0].axis_types);
+        println!("num_dofs: {:?}",num_dofs);
+        Robot{arms, num_chains, num_dofs, chain_lengths, chains_def: chains_def.unwrap().clone(), lower_joint_limits, upper_joint_limits}
 
     }
+    
+    pub fn split_joint_angles(&self, x: &[f64], idx: usize) -> Vec<f64> {
+        self.chains_def[idx].iter().map(|&i| x[i as usize].clone()).collect()
+    }
 
-    pub fn get_frames(&mut self, x: &[f64]) {
+    pub fn get_frames(&mut self, x: &[f64]) { // need translation to handle multiple arms having duplicate joints
         let mut l = 0;
         let mut r = 0;
+        let mut _ja:[f64;MAX_JOINT_CNT] = [0.0;MAX_JOINT_CNT];
         for i in 0..self.num_chains {
             r += self.chain_lengths[i];
-            self.arms[i].get_frames(&x[l..r]);
+            let ja_vec = self.split_joint_angles(x, i);
+            let ja_len = ja_vec.len();
+            for j in 0..ja_len {
+                _ja[j] = ja_vec[j];
+            }
+            // self.arms[i].get_frames(&x[l..r]);
+            self.arms[i].get_frames(&_ja[0..ja_len]);
             l = r;
         }
     }
@@ -110,9 +130,16 @@ impl Robot {
         let mut out: Vec<(Vec<nalgebra::Vector3<f64>>, Vec<nalgebra::UnitQuaternion<f64>>)> = Vec::new();
         let mut l = 0;
         let mut r = 0;
+        let mut _ja:[f64;MAX_JOINT_CNT] = [0.0;MAX_JOINT_CNT];
         for i in 0..self.num_chains {
             r += self.chain_lengths[i];
-            out.push( self.arms[i].get_frames_immutable( &x[l..r] ) );
+            let ja_vec = self.split_joint_angles(x, i);
+            let ja_len = ja_vec.len();
+            for j in 0..ja_len {
+                _ja[j] = ja_vec[j];
+            }
+            // out.push( self.arms[i].get_frames_immutable( &x[l..r] ) );
+            out.push( self.arms[i].get_frames_immutable( &_ja[0..ja_len] ) );
             l = r;
         }
         out
@@ -122,9 +149,16 @@ impl Robot {
         let mut out = 0.0;
         let mut l = 0;
         let mut r = 0;
+        let mut _ja:[f64;MAX_JOINT_CNT] = [0.0;MAX_JOINT_CNT];
         for i in 0..self.num_chains {
             r += self.chain_lengths[i];
-            out += self.arms[i].get_manipulability_immutable( &x[l..r] );
+            let ja_vec = self.split_joint_angles(x, i);
+            let ja_len = ja_vec.len();
+            for j in 0..ja_len {
+                _ja[j] = ja_vec[j];
+            }
+            // out += self.arms[i].get_manipulability_immutable( &x[l..r] );
+            out += self.arms[i].get_manipulability_immutable( &_ja[0..ja_len] );
             l = r;
         }
         out
@@ -134,9 +168,16 @@ impl Robot {
         let mut out: Vec<(nalgebra::Vector3<f64>, nalgebra::UnitQuaternion<f64>)> = Vec::new();
         let mut l = 0;
         let mut r = 0;
+        let mut _ja:[f64;MAX_JOINT_CNT] = [0.0;MAX_JOINT_CNT];
         for i in 0..self.num_chains {
             r += self.chain_lengths[i];
-            out.push( self.arms[i].get_ee_pos_and_quat_immutable( &x[l..r] ));
+            let ja_vec = self.split_joint_angles(x, i);
+            let ja_len = ja_vec.len();
+            for j in 0..ja_len {
+                _ja[j] = ja_vec[j];
+            }
+            // out.push( self.arms[i].get_ee_pos_and_quat_immutable( &x[l..r] ));
+            out.push( self.arms[i].get_ee_pos_and_quat_immutable( &_ja[0..ja_len] ));
             l = r;
         }
         out

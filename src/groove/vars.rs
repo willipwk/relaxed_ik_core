@@ -47,20 +47,30 @@ impl RelaxedIKVars {
 
         let base_links_arr = settings["base_links"].as_vec().unwrap();
         let ee_links_arr = settings["ee_links"].as_vec().unwrap();
+        let chains_def_arr = settings["chains_def"].as_vec().unwrap();
+        
         let num_chains = base_links_arr.len();
 
         let mut base_links = Vec::new();
         let mut ee_links = Vec::new();
         let mut tolerances: Vec<Vector6<f64>> = Vec::new();
+        
         for i in 0..num_chains {
             base_links.push(base_links_arr[i].as_str().unwrap().to_string());
             ee_links.push(ee_links_arr[i].as_str().unwrap().to_string());
             tolerances.push(Vector6::new(0., 0., 0., 0., 0., 0.));
         }
 
-        let urdf = &std::fs::read_to_string(path_to_urdf).unwrap();
-        let robot = Robot::from_urdf(urdf, &base_links, &ee_links);
+        let chains_def: Vec<Vec<i64>> = chains_def_arr.iter().map(|row| {
+            row.as_vec().unwrap().iter().map(|element| {
+                element.as_i64().unwrap()
+            }).collect()
+        }).collect();
 
+
+        let urdf = &std::fs::read_to_string(path_to_urdf).unwrap();
+        let robot = Robot::from_urdf(urdf, &base_links, &ee_links, Some(&chains_def));
+        println!("num_dofs:{:?}",robot.num_dofs);
         let mut starting_config = Vec::new();
         if settings["starting_config"].is_badvalue() {
             println!("No starting config provided, using all zeros");
@@ -76,6 +86,7 @@ impl RelaxedIKVars {
 
         let mut init_ee_positions: Vec<Vector3<f64>> = Vec::new();
         let mut init_ee_quats: Vec<UnitQuaternion<f64>> = Vec::new();
+        // configurations need to be without duplicated joints
         let pose = robot.get_ee_pos_and_quat_immutable(&starting_config);
         assert!(pose.len() == num_chains);
 
@@ -99,7 +110,7 @@ impl RelaxedIKVars {
             tolerances.push(Vector6::new(0., 0., 0., 0., 0., 0.));
         }
 
-        let robot = Robot::from_urdf(urdf, &configs.base_links, &configs.ee_links);
+        let robot = Robot::from_urdf(urdf, &configs.base_links, &configs.ee_links, None);
 
         let mut init_ee_positions: Vec<Vector3<f64>> = Vec::new();
         let mut init_ee_quats: Vec<UnitQuaternion<f64>> = Vec::new();

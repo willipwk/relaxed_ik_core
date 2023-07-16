@@ -26,8 +26,8 @@ impl RelaxedIK {
         let cfg: VarsConstructorData = serde_wasm_bindgen::from_value(configs).unwrap();
 
         let vars = RelaxedIKVars::from_jsvalue(cfg, &urdf);
-
-        let om = ObjectiveMaster::relaxed_ik(&vars.robot.chain_lengths);
+        let num_dofs = vars.robot.num_dofs;
+        let om = ObjectiveMaster::relaxed_ik(&vars.robot.chain_lengths, num_dofs);
         let groove = OptimizationEngineOpen::new(vars.robot.num_dofs.clone());
         Self{vars, om, groove}
     }
