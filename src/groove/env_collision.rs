@@ -93,6 +93,7 @@ impl RelaxedIKEnvCollision {
         }
 
         let mut dyn_obstacle_handles: Vec<(CollisionObjectSlabHandle, String)> = Vec::new();
+        println!("plane_obstacles: {:?}",plane_obstacles);
         for i in 0..plane_obstacles.len() {
             let plane_obs = &plane_obstacles[i];
             let half_extents = Vector3::new(plane_obs.x_halflength, plane_obs.y_halflength, plane_obs.z_halflength);
