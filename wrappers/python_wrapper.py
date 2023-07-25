@@ -9,6 +9,12 @@ class Opt(ctypes.Structure):
 class RelaxedIKS(ctypes.Structure):
     pass
 
+
+class StringArray(ctypes.Structure):
+    _fields_ = [("data", ctypes.POINTER(ctypes.c_char_p)),
+                ("len", ctypes.c_size_t)]
+    
+    
 dir_path = os.path.dirname(os.path.realpath(__file__))
 lib = ctypes.cdll.LoadLibrary(dir_path + '/../target/debug/librelaxed_ik_lib.so')
 
@@ -20,6 +26,14 @@ lib.solve_position.restype = Opt
 lib.solve_velocity.argtypes = [ctypes.POINTER(RelaxedIKS), ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.POINTER(ctypes.c_double), ctypes.c_int]
 lib.solve_velocity.restype = Opt
 lib.reset.argtypes = [ctypes.POINTER(RelaxedIKS)]
+lib.get_objective_weight_names.argtypes = [ctypes.POINTER(RelaxedIKS)]
+lib.get_objective_weight_names.restype = ctypes.POINTER(StringArray)
+
+lib.get_objective_weight_priors.argtypes = [ctypes.POINTER(RelaxedIKS)]
+lib.get_objective_weight_priors.restype  = Opt
+lib.set_objective_weight_priors.argtypes = [ctypes.POINTER(RelaxedIKS), ctypes.POINTER(ctypes.c_double), ctypes.c_int]
+lib.set_objective_weight_priors.restype  = None
+
 
 class RelaxedIKRust:
     def __init__(self, setting_file_path = None):
@@ -79,6 +93,38 @@ class RelaxedIKRust:
         for i in range(len(joint_state)):
             js_arr[i] = joint_state[i]
         lib.reset(self.obj, js_arr, len(js_arr))
-
+        
+    def dynamic_obstacle_cb(self, marker_name: str, pose):
+        pos_arr = (ctypes.c_double * 3)()
+        quat_arr = (ctypes.c_double * 4)()
+        pos_arr[0]  = pose.position.x
+        pos_arr[1]  = pose.position.y
+        pos_arr[2]  = pose.position.z
+        quat_arr[0] = pose.orientation.x
+        quat_arr[1] = pose.orientation.y
+        quat_arr[2] = pose.orientation.z
+        quat_arr[3] = pose.orientation.w 
+        
+        name_bytes = marker_name.encode('utf-8') # Convert to bytes
+        c_name = ctypes.c_char_p(name_bytes)  # Create ctypes char pointer
+        
+        lib.dynamic_obstacle_cb(self.obj, c_name, pos_arr, quat_arr)
+        
+    def get_objective_weight_names(self):
+        string_array_ptr = lib.get_objective_weight_names(self.obj)
+        strings = [string_array_ptr.contents.data[i].decode('utf-8') for i in range(string_array_ptr.contents.len)]
+        return strings
+    
+    def get_objective_weight_priors(self):
+        w = lib.get_objective_weight_priors(self.obj)
+        return w.data[:w.length]
+    
+    def set_objective_weight_priors(self, w):
+        w_arr = (ctypes.c_double * len(w))()
+        for i in range(len(w)):
+            w_arr[i] = w[i]
+        lib.set_objective_weight_priors(self.obj, w_arr, len(w_arr))
+    
+    
 if __name__ == '__main__':
     pass

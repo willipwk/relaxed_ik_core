@@ -258,14 +258,16 @@ impl RelaxedIKVars {
                     // println!("VARS -> {:?}, Link{}, Distance: {:?}", obstacle.data(), j, dis);
                     if dis > 0.0 {
                         sum += a / (dis + link_radius).powi(2);
-                    }  else {
+                    } else if /*self.objective_mode != "noECA"*/ true {
+                        return true;
+                    } else {
                         break;
                     }
                 }
                 active_candidates.push((Some(*key), sum));
             }
 
-            println!("Number of active obstacles candidates: {}", active_candidates.len());
+            // println!("Number of active obstacles candidates: {}", active_candidates.len());
             {
                 if active_candidates.len() > filter_cutoff {
                     active_candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());

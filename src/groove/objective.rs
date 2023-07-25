@@ -160,15 +160,18 @@ pub struct SelfCollision {
     pub arm_idx_0: usize,
     pub arm_idx_1: usize,
     pub first_link: usize,
-    pub second_link: usize
+    pub second_link: usize,
+    pub is_ee_link_0: bool,
+    pub is_ee_link_1: bool,
 }
 impl SelfCollision {
-    pub fn new(arm_idx_0: usize, arm_idx_1: usize, first_link: usize, second_link: usize) -> Self {Self{arm_idx_0, arm_idx_1, first_link, second_link}}
+    pub fn new(arm_idx_0: usize, arm_idx_1: usize, first_link: usize, second_link: usize, is_ee_link_0: bool, is_ee_link_1: bool) 
+        -> Self {Self{arm_idx_0, arm_idx_1, first_link, second_link, is_ee_link_0, is_ee_link_1}}
 }
 impl ObjectiveTrait for SelfCollision {
     fn call(&self, x: &[f64], v: &vars::RelaxedIKVars, frames: &Vec<(Vec<nalgebra::Vector3<f64>>, Vec<nalgebra::UnitQuaternion<f64>>)>) -> f64 {
         for i in 0..x.len() {
-            if (x[i].is_nan()) {
+            if x[i].is_nan() {
                 return 10.0
             }
         }
@@ -188,8 +191,42 @@ impl ObjectiveTrait for SelfCollision {
         let segment_pos = nalgebra::one(); 
         // pos 1 and pos 2 are transformations, since we use global positions, just pass identity
         // println!("start_pt_1:{} end_pt_1:{}  start_pt_2:{} end_pt_2:{} x: {:?}", start_pt_1, end_pt_1, start_pt_2, end_pt_2, x);
+        
+        
+        // if self.is_ee_link_0 && self.is_ee_link_1{
+        //     let mut shape_0 = shape::Capsule::new(start_pt_1, start_pt_2, 0.1);
+        // } 
+        // else {
+        //     let mut shape_0 = segment_1;
+        // }
 
-        let dis = query::distance(&segment_pos, &segment_1, &segment_pos, &segment_2).unwrap() - 0.05;
+        let capsule_1 = shape::Capsule::new(start_pt_1 + (end_pt_1 - start_pt_1) * 0.2, end_pt_1 + (end_pt_1 - start_pt_1) * 0.5, link_radius * 1.0);
+        let capsule_2 = shape::Capsule::new(start_pt_2 + (end_pt_1 - start_pt_1) * 0.2, end_pt_2 + (end_pt_2 - start_pt_2) * 0.5, link_radius * 1.0);
+
+
+        let mut dis: f64 = 0.0;
+        
+        if !self.is_ee_link_0 && !self.is_ee_link_1 {
+            dis = query::distance(&segment_pos, &segment_1, &segment_pos, &segment_2).unwrap() - 0.05;
+        } 
+
+        if self.is_ee_link_0 && !self.is_ee_link_1 {
+            dis = query::distance(&segment_pos, &capsule_1, &segment_pos, &segment_2).unwrap() - 0.025;
+        }
+        if !self.is_ee_link_0 && self.is_ee_link_1 {
+            dis = query::distance(&segment_pos, &segment_1, &segment_pos, &capsule_2).unwrap() - 0.025;
+        }
+        if self.is_ee_link_0 && self.is_ee_link_1 {
+            dis = query::distance(&segment_pos, &capsule_1, &segment_pos, &capsule_2).unwrap() - 0.025;
+        }
+        // if self.is_ee_link_0 {
+        //     println!("{:?} {:?}",self.arm_idx_0, self.arm_idx_1);
+        //     println!("{:?} -- {:?}",start_pt_1, end_pt_1);
+        // }
+        if dis < 0.0 {
+            dis = 0.0
+        }
+        
         // println!("dis:{:?}",dis);
         swamp_loss(dis, 0.02, 1.5, 60.0, 0.0001, 30)
     }
@@ -221,7 +258,7 @@ impl ObjectiveTrait for EnvCollision {
         let link_radius = v.env_collision.link_radius;
         let penalty_cutoff: f64 = link_radius * 2.0;
         let a = penalty_cutoff.powi(2);
-        println!("active obs: {:?}",v.env_collision.active_obstacles);
+        // println!("active obs: {:?}",v.env_collision.active_obstacles);
         for (option, score) in &v.env_collision.active_obstacles[self.arm_idx] {
             if let Some(handle) = option {
                 let mut sum: f64 = 0.0;
@@ -230,9 +267,9 @@ impl ObjectiveTrait for EnvCollision {
                 for i in 0..last_elem {
                     let mut start_pt = Point3::from(frames[self.arm_idx].0[i]);
                      // hard coded for ur5
-                    if i == last_elem - 1 {
-                        start_pt = Point3::from(frames[self.arm_idx].0[i] + 0.2 * (frames[self.arm_idx].0[i] - frames[self.arm_idx].0[i + 1]));
-                    }
+                    // if i == last_elem - 1 {
+                    //     start_pt = Point3::from(frames[self.arm_idx].0[i] + 0.2 * (frames[self.arm_idx].0[i] - frames[self.arm_idx].0[i + 1]));
+                    // }
 
                     let end_pt = Point3::from(frames[self.arm_idx].0[i + 1]);
                     let segment = shape_nc::Segment::new(start_pt, end_pt);
@@ -248,8 +285,9 @@ impl ObjectiveTrait for EnvCollision {
         
         // let end = PreciseTime::now();
         // println!("Obstacles calculating takes {}", start.to(end));
-        println!("x_collision = {:?}",x_val);
+        // println!("x_collision = {:?}",x_val);
         groove_loss(x_val, 0., 2, 3.5, 0.00005, 4)
+
     }
 
     fn call_lite(&self, x: &[f64], v: &vars::RelaxedIKVars, ee_poses: &Vec<(nalgebra::Vector3<f64>, nalgebra::UnitQuaternion<f64>)>) -> f64 {

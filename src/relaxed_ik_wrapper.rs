@@ -3,6 +3,9 @@ use std::sync::{Arc, Mutex};
 use nalgebra::{Vector3, Vector6, UnitQuaternion, Quaternion,Translation3, Isometry3};
 use std::os::raw::{*};
 use std::str;
+use std::os::raw::{c_char, c_void};
+use std::ffi::CString;
+use std::ptr;
 use crate::utils_rust::file_utils::{*};
 
 // http://jakegoulding.com/rust-ffi-omnibus/objects/
@@ -207,4 +210,97 @@ fn solve_velocity_helper(relaxed_ik: &mut RelaxedIK, pos_vels: Vec<f64>, rot_vel
     let dist = (ee_pos - goal).norm();
 
     return x;
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn dynamic_obstacle_cb(ptr: *mut RelaxedIK, name: *const c_char, pos_arr: *const c_double, quat_arr: *const c_double) {
+    assert!(!name.is_null(), "Empty name!");
+    assert!(!pos_arr.is_null(), "Null pointer for pos!");
+    assert!(!quat_arr.is_null(), "Null pointer for quat!");
+
+    let relaxed_ik = unsafe {
+        assert!(!ptr.is_null());
+        &mut *ptr
+    };
+
+    let c_str = std::ffi::CStr::from_ptr(name);
+    let name_str = c_str.to_str().expect("Not a valid UTF-8 string");
+
+    let pos_slice: &[c_double] = std::slice::from_raw_parts(pos_arr, 3);
+    let quat_slice: &[c_double] = std::slice::from_raw_parts(quat_arr, 4);
+
+    let pos_vec = pos_slice.to_vec();
+    let quat_vec = quat_slice.to_vec();
+
+    let ts = Translation3::new(pos_vec[0], pos_vec[1], pos_vec[2]);
+    let tmp_q = Quaternion::new(quat_vec[3], quat_vec[0], quat_vec[1], quat_vec[2]);
+    let rot = UnitQuaternion::from_quaternion(tmp_q);
+    let pos = Isometry3::from_parts(ts, rot);
+
+    // println!("dynamic_obstacle_cb: {:?} -> {:?}",name_str, pos);
+    relaxed_ik.vars.env_collision.update_dynamic_obstacle(name_str, pos);
+}
+
+
+#[no_mangle]
+pub unsafe extern "C" fn get_objective_weight_priors(ptr: *mut RelaxedIK) -> Opt {
+    let relaxed_ik = unsafe {
+        assert!(!ptr.is_null());
+        &mut *ptr
+    };
+
+    let ptr = relaxed_ik.om.weight_priors.as_ptr();
+    let len = relaxed_ik.om.weight_priors.len();
+    std::mem::forget(ptr);
+    Opt {data: ptr, length: len as c_int}
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn set_objective_weight_priors(ptr: *mut RelaxedIK, weights: *const c_double, weights_len: c_int) {
+    let relaxed_ik = unsafe {
+        assert!(!ptr.is_null());
+        &mut *ptr
+    };
+    assert!(!weights.is_null(),"Null pointer for weights!");
+    assert!(weights_len as usize == relaxed_ik.om.weight_priors.len());
+
+    let w = std::slice::from_raw_parts(weights, weights_len as usize);
+    for i in 0..relaxed_ik.om.weight_priors.len() {
+        relaxed_ik.om.weight_priors[i] = w[i];
+    }
+}
+
+
+
+#[repr(C)]
+pub struct StringArray {
+    data: *mut *mut c_char,
+    len: usize,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn get_objective_weight_names(ptr: *mut RelaxedIK) -> *mut c_void {
+    let relaxed_ik = unsafe {
+        assert!(!ptr.is_null());
+        &mut *ptr
+    };
+
+
+    let mut c_strings = Vec::new();
+
+    for s in &relaxed_ik.om.weight_names {
+        let c_string = CString::new(s.clone()).unwrap();
+        c_strings.push(c_string.into_raw());
+    }
+
+    let string_array = StringArray {
+        data: c_strings.as_mut_ptr(),
+        len: c_strings.len(),
+    };
+
+    // Prevent the destructor from being called, as the memory is now owned
+    // by Python code.
+    let _ = Box::into_raw(c_strings.into_boxed_slice());
+
+    Box::into_raw(Box::new(string_array)) as *mut c_void
 }

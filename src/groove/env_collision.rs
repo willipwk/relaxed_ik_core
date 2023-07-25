@@ -171,11 +171,14 @@ impl RelaxedIKEnvCollision {
         name: &str,
         position: Isometry3<f64>,
     ) {
+        // println!("{:?} -> {:?}",name,position);
         for (handle, id) in &self.dyn_obstacle_handles {
             if id == name {
                 let co = self.world.objects.get_mut(*handle).unwrap();
                 co.set_position(position);
+                
                 break;
+                
             }
         }
     }

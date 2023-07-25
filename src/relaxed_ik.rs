@@ -40,18 +40,22 @@ impl RelaxedIK {
 
         let in_collision = self.vars.update_collision_world();
 
-        if !in_collision {
+        if !false {
             self.groove.optimize(&mut out_x, &self.vars, &self.om, 100);
 
-            let frames = self.vars.robot.get_frames_immutable(&out_x);
+            // let frames = self.vars.robot.get_frames_immutable(&out_x);
 
             for i in 0..out_x.len() {
-                if (out_x[i].is_nan()) {
+                if out_x[i].is_nan() {
                     println!("No valid solution found! Returning previous solution: {:?}. End effector position goals: {:?}", self.vars.xopt, self.vars.goal_positions);
+                    // return self.vars.xopt.clone();
                     return self.vars.xopt.clone();
                 }
             }
             self.vars.update(out_x.clone());  
+        }
+        if in_collision {
+            println!("Robot in collision with obstacles!");
         }
         out_x
     }
