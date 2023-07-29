@@ -2,7 +2,6 @@ use crate::spacetime::arm;
 use nalgebra;
 use urdf_rs;
 use std::collections::HashSet;
-pub const MAX_JOINT_CNT: usize = 1024;
 #[derive(Clone, Debug)]
 pub struct Robot {
     pub arms: Vec<arm::Arm>,
@@ -127,75 +126,55 @@ impl Robot {
     }
 
     pub fn get_frames(&mut self, x: &[f64]) { // need translation to handle multiple arms having duplicate joints
-        let mut l = 0;
-        let mut r = 0;
-        let mut _ja:[f64;MAX_JOINT_CNT] = [0.0;MAX_JOINT_CNT];
+        // let mut l = 0;
+        // let mut r = 0;
         for i in 0..self.num_chains {
-            r += self.chain_lengths[i];
+            // r += self.chain_lengths[i];
             let ja_vec = self.split_joint_angles(x, i);
-            let ja_len = ja_vec.len();
-            for j in 0..ja_len {
-                _ja[j] = ja_vec[j];
-            }
             // self.arms[i].get_frames(&x[l..r]);
-            self.arms[i].get_frames(&_ja[0..ja_len]);
-            l = r;
+            self.arms[i].get_frames(&ja_vec[0..ja_vec.len()]);
+            // l = r;
         }
     }
 
     pub fn get_frames_immutable(&self, x: &[f64]) -> Vec<(Vec<nalgebra::Vector3<f64>>, Vec<nalgebra::UnitQuaternion<f64>>)> {
         let mut out: Vec<(Vec<nalgebra::Vector3<f64>>, Vec<nalgebra::UnitQuaternion<f64>>)> = Vec::new();
-        let mut l = 0;
-        let mut r = 0;
-        let mut _ja:[f64;MAX_JOINT_CNT] = [0.0;MAX_JOINT_CNT];
+        // let mut l = 0;
+        // let mut r = 0;
         for i in 0..self.num_chains {
-            r += self.chain_lengths[i];
+            // r += self.chain_lengths[i];
             let ja_vec = self.split_joint_angles(x, i);
-            let ja_len = ja_vec.len();
-            for j in 0..ja_len {
-                _ja[j] = ja_vec[j];
-            }
             // out.push( self.arms[i].get_frames_immutable( &x[l..r] ) );
-            out.push( self.arms[i].get_frames_immutable( &_ja[0..ja_len] ) );
-            l = r;
+            out.push( self.arms[i].get_frames_immutable(&ja_vec[0..ja_vec.len()]));
+            // l = r;
         }
         out
     }
     
     pub fn get_manipulability_immutable(&self, x: &[f64]) -> f64 {
         let mut out = 0.0;
-        let mut l = 0;
-        let mut r = 0;
-        let mut _ja:[f64;MAX_JOINT_CNT] = [0.0;MAX_JOINT_CNT];
+        // let mut l = 0;
+        // let mut r = 0;
         for i in 0..self.num_chains {
-            r += self.chain_lengths[i];
+            // r += self.chain_lengths[i];
             let ja_vec = self.split_joint_angles(x, i);
-            let ja_len = ja_vec.len();
-            for j in 0..ja_len {
-                _ja[j] = ja_vec[j];
-            }
             // out += self.arms[i].get_manipulability_immutable( &x[l..r] );
-            out += self.arms[i].get_manipulability_immutable( &_ja[0..ja_len] );
-            l = r;
+            out += self.arms[i].get_manipulability_immutable(&ja_vec[0..ja_vec.len()]);
+            // l = r;
         }
         out
     }
 
     pub fn get_ee_pos_and_quat_immutable(&self, x: &[f64]) -> Vec<(nalgebra::Vector3<f64>, nalgebra::UnitQuaternion<f64>)> {
         let mut out: Vec<(nalgebra::Vector3<f64>, nalgebra::UnitQuaternion<f64>)> = Vec::new();
-        let mut l = 0;
-        let mut r = 0;
-        let mut _ja:[f64;MAX_JOINT_CNT] = [0.0;MAX_JOINT_CNT];
+        // let mut l = 0;
+        // let mut r = 0;
         for i in 0..self.num_chains {
-            r += self.chain_lengths[i];
+            // r += self.chain_lengths[i];
             let ja_vec = self.split_joint_angles(x, i);
-            let ja_len = ja_vec.len();
-            for j in 0..ja_len {
-                _ja[j] = ja_vec[j];
-            }
             // out.push( self.arms[i].get_ee_pos_and_quat_immutable( &x[l..r] ));
-            out.push( self.arms[i].get_ee_pos_and_quat_immutable( &_ja[0..ja_len] ));
-            l = r;
+            out.push( self.arms[i].get_ee_pos_and_quat_immutable(&ja_vec[0..ja_vec.len()]));
+            // l = r;
         }
         out
     }
