@@ -67,7 +67,7 @@ impl ObjectiveMaster {
         }
 
         for j in 0..num_dofs {
-            println!("JointLimitIdx:{:?}",j);
+            // println!("JointLimitIdx:{:?}",j);
             objectives.push(Box::new(EachJointLimits::new(j))); weight_priors.push(1.0);
             weight_names.push(String::from("jointlimit"));
         }
