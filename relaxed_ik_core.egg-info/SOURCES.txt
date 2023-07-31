@@ -1,0 +1,7 @@
+LICENSE
+README.md
+setup.py
+relaxed_ik_core.egg-info/PKG-INFO
+relaxed_ik_core.egg-info/SOURCES.txt
+relaxed_ik_core.egg-info/dependency_links.txt
+relaxed_ik_core.egg-info/top_level.txt
