@@ -61,7 +61,7 @@ impl ObjectiveMaster {
             weight_names.push(String::from("eequat"));
 
             objectives.push(Box::new(EnvCollision::new(i)));
-            weight_priors.push(10.0);
+            weight_priors.push(15.0);
             weight_names.push(String::from("envcollision"));
             // num_dofs += chain_lengths[i];
         }
@@ -151,9 +151,13 @@ impl ObjectiveMaster {
     fn __call(&self, x: &[f64], vars: &RelaxedIKVars) -> f64 {
         let mut out = 0.0;
         let frames = vars.robot.get_frames_immutable(x);
+        let mut temp: Vec<f64> = Vec::new();
         for i in 0..self.objectives.len() {
-            out += self.weight_priors[i] * self.objectives[i].call(x, vars, &frames);
+            let l = self.weight_priors[i] * self.objectives[i].call(x, vars, &frames);
+            temp.push(l);
+            out += l;
         }
+        // println!("temp: {:?}", temp);
         out
     }
 

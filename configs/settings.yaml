@@ -29,6 +29,6 @@ obstacles:
 
 
 # For trajectory tracing
-traj_files: [traject_6d_5_right.npy, traject_6d_5_left.npy]
+# traj_files: [traject_6d_5_right.npy, traject_6d_5_left.npy]
 
-# traj_files: [traject_6d_1.npy]
+traj_files: [traject_6d_1.npy]

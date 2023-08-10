@@ -2,8 +2,9 @@ use crate::groove::{vars};
 use crate::utils_rust::transformations::{*};
 use nalgebra::geometry::{Translation3, UnitQuaternion, Quaternion};
 use std::cmp;
+use std::f64::consts::PI;
 use crate::groove::vars::RelaxedIKVars;
-use nalgebra::{Vector3, Isometry3, Point3};
+use nalgebra::{Vector3, Isometry3, Point3, Rotation, Unit};
 use std::ops::Deref;
 use time::PreciseTime;
 use parry3d_f64::{shape, query};
@@ -265,21 +266,49 @@ impl ObjectiveTrait for EnvCollision {
                 let obstacle = v.env_collision.world.objects.get(*handle).unwrap();
                 let last_elem = frames[self.arm_idx].0.len() - 1;
                 for i in 0..last_elem {
-                    let mut start_pt = Point3::from(frames[self.arm_idx].0[i]);
+                    let start_pt = Point3::from(frames[self.arm_idx].0[i]);
+                    let start_quat = frames[self.arm_idx].1[i];
                      // hard coded for ur5
                     // if i == last_elem - 1 {
                     //     start_pt = Point3::from(frames[self.arm_idx].0[i] + 0.2 * (frames[self.arm_idx].0[i] - frames[self.arm_idx].0[i + 1]));
                     // }
-                    let mut end_pt = Point3::from(frames[self.arm_idx].0[i + 1]);
+                    let end_pt = Point3::from(frames[self.arm_idx].0[i + 1]);
+                    
+                    //
+                    let end_quat = frames[self.arm_idx].1[i+1];
+                    
 
-                    // hard coded for movo
-                    if i == last_elem - 1 {
-                        end_pt += (end_pt - start_pt) * 0.3;
-                    }
-
+                    
                     let segment = shape_nc::Segment::new(start_pt, end_pt);
                     let segment_pos = nalgebra::one();
-                    let dis = query_nc::distance(obstacle.position(), obstacle.shape().deref(), &segment_pos, &segment) - link_radius;
+                    let dis = 
+                        // hard coded for movo
+                        if i == last_elem - 1 {
+                            let ee_direction = end_quat;
+                            let ee_dir_vec = ee_direction * Point3::from(nalgebra::Vector3::new(1.0, 0.0, 0.0));
+                            let capsule_translation = Translation3::from(end_pt - ee_dir_vec * 0.1);
+
+                            let initial_direction = Vector3::new(0.0, 1.0, 0.0); // capsule primary axis is y axis
+                            let capsule_rotation = match nalgebra::Rotation3::rotation_between(&initial_direction, &(ee_direction * nalgebra::Vector3::new(1.0, 0.0, 0.0))) {
+                                Some(r) => r,
+                                None => nalgebra::Rotation3::from_euler_angles(0.0, 0.0, 0.0)
+                            };
+
+                            let capsule_pos = nalgebra::Isometry3::from_parts(capsule_translation, UnitQuaternion::from_rotation_matrix(&capsule_rotation));
+                            let capsule = shape_nc::Capsule::new(0.10, 0.05);
+                            if self.arm_idx == 0 {
+                                println!("Capsule pos{:?}", capsule_pos);
+                            }
+                            query_nc::distance(obstacle.position(), obstacle.shape().deref(), &capsule_pos, &capsule)
+                        } else {
+                            query_nc::distance(obstacle.position(), obstacle.shape().deref(), &segment_pos, &segment) - link_radius
+                        };
+
+                        if i == last_elem - 1 && self.arm_idx == 0 {
+                            println!("dis: {:?}",dis);
+
+                        }
+
                     // println!("Obstacle: {}, Link: {}, Distance: {:?}", obstacle.data().name, i, dis);
                     sum += a / (dis + link_radius).powi(2);
                 }

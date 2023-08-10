@@ -1,4 +1,5 @@
 use nalgebra::{UnitQuaternion, Vector3, Vector6, Quaternion, Point3};
+use std::f64::consts::PI;
 use crate::spacetime::robot::Robot;
 use crate::utils_rust::file_utils::{*};
 use crate::utils_rust::yaml_utils::{*};
@@ -254,7 +255,25 @@ impl RelaxedIKVars {
                     let end_pt = Point3::from(frames[arm_idx].0[j + 1]);
                     let segment = Segment::new(start_pt, end_pt);
                     let segment_pos = nalgebra::one();
-                    let dis = distance(obstacle.position(), obstacle.shape().deref(), &segment_pos, &segment) - link_radius;
+                    let dis = if j == last_elem - 1 {
+                         // hard coded for movo
+                        let ee_direction = frames[arm_idx].1[j+1];
+                        let ee_dir_vec = ee_direction * Point3::from(nalgebra::Vector3::new(1.0, 0.0, 0.0));
+                        let capsule_translation = nalgebra::Translation3::from(end_pt - ee_dir_vec * 0.1);
+                        let initial_direction = Vector3::new(0.0, 1.0, 0.0); // capsule primary axis is y axis
+                        let capsule_rotation = match nalgebra::Rotation3::rotation_between(&initial_direction, &(ee_direction * nalgebra::Vector3::new(1.0, 0.0, 0.0))) {
+                            Some(r) => r,
+                            None => nalgebra::Rotation3::from_euler_angles(0.0, 0.0, 0.0)
+                        };
+                        let capsule_pos = nalgebra::Isometry3::from_parts(capsule_translation, UnitQuaternion::from_rotation_matrix(&capsule_rotation));
+                        let capsule = Capsule::new(0.10, 0.05);
+
+                        distance(obstacle.position(), obstacle.shape().deref(), &capsule_pos, &capsule)
+                    }
+                    else { 
+                        distance(obstacle.position(), obstacle.shape().deref(), &segment_pos, &segment) - link_radius 
+                    }; 
+
                     // println!("VARS -> {:?}, Link{}, Distance: {:?}", obstacle.data(), j, dis);
                     if dis > 0.0 {
                         sum += a / (dis + link_radius).powi(2);
