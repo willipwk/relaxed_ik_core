@@ -1,4 +1,5 @@
 urdf: simplified_movo.urdf
+srdf: simplified_movo.srdf
 link_radius: 0.05 
 base_links:
   - base_link

@@ -20,14 +20,23 @@ pub struct RelaxedIK {
 #[wasm_bindgen]
 impl RelaxedIK {
     #[wasm_bindgen(constructor)]
-    pub fn new( configs:  JsValue, urdf: String) -> Self {
+    pub fn new( configs:  JsValue, urdf: String, srdf: String) -> Self {
         console_error_panic_hook::set_once();
 
         let cfg: VarsConstructorData = serde_wasm_bindgen::from_value(configs).unwrap();
 
-        let vars = RelaxedIKVars::from_jsvalue(cfg, &urdf);
+        let vars = RelaxedIKVars::from_jsvalue(cfg, &urdf, &srdf);
         let num_dofs = vars.robot.num_dofs;
-        let om = ObjectiveMaster::relaxed_ik(&vars.robot.chain_lengths, &vars.chains_def, num_dofs, &vars.is_active_chain, &vars.arm_group, &vars.collision_starting_indices, vars.num_links_ee_to_tip);
+        let disabled_collisions = vars.get_collision_disabled_set();
+        let om = ObjectiveMaster::relaxed_ik(&vars.robot.arm_link_names,
+            &vars.robot.chain_lengths, 
+            &vars.chains_def, 
+            num_dofs, 
+            &vars.is_active_chain, 
+            &vars.arm_group, 
+            &vars.collision_starting_indices, 
+            &disabled_collisions,
+            vars.num_links_ee_to_tip);
         let groove = OptimizationEngineOpen::new(vars.robot.num_dofs.clone());
         Self{vars, om, groove}
     }

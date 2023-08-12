@@ -7,6 +7,7 @@ use std::os::raw::{c_char, c_void};
 use std::ffi::CString;
 use std::ptr;
 use crate::utils_rust::file_utils::{*};
+use std::time::Instant;
 
 // http://jakegoulding.com/rust-ffi-omnibus/objects/
 #[no_mangle]
@@ -77,7 +78,9 @@ pub unsafe extern "C" fn solve_position(ptr: *mut RelaxedIK, pos_goals: *const c
     assert!(tolerance_length as usize == num_active_chains * 6, 
         "Tolerance are expected to have {} numbers, but got {}", 
         num_active_chains * 6, tolerance_length);
-
+    
+    let start = Instant::now();
+    
     let pos_slice: &[c_double] = std::slice::from_raw_parts(pos_goals, pos_length as usize);
     let quat_slice: &[c_double] = std::slice::from_raw_parts(quat_goals, quat_length as usize);
     let tolerance_slice: &[c_double] = std::slice::from_raw_parts(tolerance, tolerance_length as usize);
@@ -91,6 +94,11 @@ pub unsafe extern "C" fn solve_position(ptr: *mut RelaxedIK, pos_goals: *const c
     let ptr = ja.as_ptr();
     let len = ja.len();
     std::mem::forget(ja);
+
+    let elapsed = start.elapsed();
+    println!("Rust time: {:?} ms", elapsed.as_millis());
+
+
     Opt {data: ptr, length: len as c_int}
 }
 

@@ -27,7 +27,7 @@ impl ObjectiveMaster {
     // }
 
 
-    pub fn relaxed_ik(chain_lengths: &[usize], chains_def: &Vec<Vec<i64>>, num_dofs: usize, is_active_chain: &[bool], arm_group: &[usize], collision_starting_indices: &[usize], num_links_ee_to_tip: i64) -> Self {
+    pub fn relaxed_ik(arm_link_names: &Vec<Vec<String>>, chain_lengths: &[usize], chains_def: &Vec<Vec<i64>>, num_dofs: usize, is_active_chain: &[bool], arm_group: &[usize], collision_starting_indices: &[usize], disabled_collisions: &BTreeSet<(String, String)>, num_links_ee_to_tip: i64) -> Self {
         let mut objectives: Vec<Box<dyn ObjectiveTrait + Send>> = Vec::new();
         let mut weight_priors: Vec<f64> = Vec::new();
         let mut weight_names: Vec<String> = Vec::new();
@@ -36,7 +36,7 @@ impl ObjectiveMaster {
         println!("collision_starting_indices: {:?}",collision_starting_indices);
         println!("chain_lengths: {:?}", chain_lengths);
         println!("arm_group: {:?}", arm_group);
-
+        println!("disabled_collisions: {:?}", disabled_collisions);
         for i in 0..num_chains {
             if is_active_chain[i] {
                 // objectives.push(Box::new(MatchEEPosiDoF::new(i, 0)));
@@ -82,12 +82,24 @@ impl ObjectiveMaster {
         objectives.push(Box::new(MinimizeJerk));            weight_priors.push(0.3);  weight_names.push(String::from("minjerk"));
         objectives.push(Box::new(MaximizeManipulability));  weight_priors.push(1.0);  weight_names.push(String::from("maxmanip"));
 
+        let mut collisions : BTreeSet<(String, String)> = BTreeSet::new();
         for i in 0..num_chains {
             if !is_active_chain[i] {
                 continue;
             }
             for j in collision_starting_indices[i]..chain_lengths[i]-2 {
                 for k in j+2..chain_lengths[i] {
+                    let link_name_1 = arm_link_names[i][j].clone();
+                    let link_name_2 = arm_link_names[i][k].clone();
+                    let link_pair = if link_name_1 < link_name_2 {(link_name_1, link_name_2)} else {(link_name_2, link_name_1)};
+                    if collisions.contains(&link_pair) {
+                        println!("Dup1! {:?}",link_pair);
+                    }
+                    if disabled_collisions.contains(&link_pair) || collisions.contains(&link_pair){
+                        continue;
+                    }
+                    
+                    collisions.insert(link_pair);
                     objectives.push(Box::new(SelfCollision::new(i, i,  j, k, false, false))); 
                     weight_priors.push(0.1);
                     weight_names.push(String::from("selfcollision"));
@@ -102,10 +114,21 @@ impl ObjectiveMaster {
                 }
                 for i in collision_starting_indices[a1]..chain_lengths[a1] {
                     for j in collision_starting_indices[a2]..chain_lengths[a2] {
+                        let link_name_1 = arm_link_names[a1][i].clone();
+                        let link_name_2 = arm_link_names[a2][j].clone();
+                        let link_pair = if link_name_1 < link_name_2 {(link_name_1, link_name_2)} else {(link_name_2, link_name_1)};
+                        if collisions.contains(&link_pair) {
+                            println!("Dup2! {:?}",link_pair);
+                        }
+                        if disabled_collisions.contains(&link_pair) || collisions.contains(&link_pair){
+                            continue;
+                        }
+                        
                         let is_ee_link_0 = i >= chain_lengths[a1] - 3;
                         let is_ee_link_1 = j >= chain_lengths[a2] - 3;
+
+                        collisions.insert(link_pair);
                         objectives.push(Box::new(SelfCollision::new(a1, a2,  i, j, is_ee_link_0, is_ee_link_1))); 
-                        
                         if is_ee_link_0 && is_ee_link_1 {
                             weight_priors.push(0.05);
                             weight_names.push(String::from("selfcollision_ee"));

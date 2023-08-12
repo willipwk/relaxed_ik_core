@@ -5,6 +5,7 @@ use std::collections::HashSet;
 #[derive(Clone, Debug)]
 pub struct Robot {
     pub arms: Vec<arm::Arm>,
+    pub arm_link_names: Vec<Vec<String>>,
     pub num_chains: usize,
     pub num_dofs: usize,
     pub chain_lengths: Vec<usize>,
@@ -28,6 +29,7 @@ impl Robot {
 
         let mut lower_joint_limits = Vec::new();
         let mut upper_joint_limits = Vec::new();
+        let mut arm_link_names: Vec<Vec<String>> = Vec::new();
         println!("chains_def: {:?}",chains_def);
 
         for i in 0..num_chains {
@@ -112,7 +114,8 @@ impl Robot {
             // chain_lengths.push(axis_types.len() as usize);
             chain_lengths.push(num_links_inbetween);
             // num_dofs += axis_types.len();
-            println!("Link names of arm {}: {:?}", i, link_names)
+            println!("Link names of arm {}: {:?}", i, link_names);
+            arm_link_names.push(link_names);            
         }
         num_dofs = articulated_joint_names.len();
         println!("axis types: {:?}", arms[0].axis_types);
@@ -121,7 +124,7 @@ impl Robot {
         println!("lower_joint_limits: {:?}",lower_joint_limits);
         println!("upper_joint_limits: {:?}",upper_joint_limits);
         println!("chain_lengths: {:?}", chain_lengths);
-        Robot{arms, num_chains, num_dofs, chain_lengths, chains_def: chains_def.clone(), lower_joint_limits, upper_joint_limits}
+        Robot{arms, arm_link_names, num_chains, num_dofs, chain_lengths, chains_def: chains_def.clone(), lower_joint_limits, upper_joint_limits}
 
     }
     

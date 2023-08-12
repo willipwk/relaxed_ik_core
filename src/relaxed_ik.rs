@@ -24,7 +24,16 @@ impl RelaxedIK {
 
         let vars = RelaxedIKVars::from_local_settings(path_to_setting);
         let num_dofs = vars.robot.num_dofs;
-        let om = ObjectiveMaster::relaxed_ik(&vars.robot.chain_lengths, &vars.chains_def, num_dofs, &vars.is_active_chain, &vars.arm_group, &vars.collision_starting_indices, vars.num_links_ee_to_tip);
+        let disabled_collisions = vars.get_collision_disabled_set();
+        let om = ObjectiveMaster::relaxed_ik(&vars.robot.arm_link_names,
+                                                              &vars.robot.chain_lengths, 
+                                                              &vars.chains_def, 
+                                                              num_dofs, 
+                                                              &vars.is_active_chain, 
+                                                              &vars.arm_group, 
+                                                              &vars.collision_starting_indices, 
+                                                              &disabled_collisions,
+                                                              vars.num_links_ee_to_tip);
 
         let groove = OptimizationEngineOpen::new(vars.robot.num_dofs.clone());
 
