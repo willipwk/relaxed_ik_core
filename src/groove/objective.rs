@@ -201,8 +201,8 @@ impl ObjectiveTrait for SelfCollision {
         //     let mut shape_0 = segment_1;
         // }
 
-        let capsule_1 = shape::Capsule::new(start_pt_1 + (end_pt_1 - start_pt_1) * 0.2, end_pt_1 + (end_pt_1 - start_pt_1) * 0.5, link_radius * 1.0);
-        let capsule_2 = shape::Capsule::new(start_pt_2 + (end_pt_1 - start_pt_1) * 0.2, end_pt_2 + (end_pt_2 - start_pt_2) * 0.5, link_radius * 1.0);
+        let capsule_1 = shape::Capsule::new(start_pt_1 + (end_pt_1 - start_pt_1) * 0.2, end_pt_1 + (end_pt_1 - start_pt_1) * 0.2, 0.01);
+        let capsule_2 = shape::Capsule::new(start_pt_2 + (end_pt_1 - start_pt_1) * 0.2, end_pt_2 + (end_pt_2 - start_pt_2) * 0.2, 0.01);
 
 
         let mut dis: f64 = 0.0;
@@ -218,7 +218,7 @@ impl ObjectiveTrait for SelfCollision {
             dis = query::distance(&segment_pos, &segment_1, &segment_pos, &capsule_2).unwrap() - 0.025;
         }
         if self.is_ee_link_0 && self.is_ee_link_1 {
-            dis = query::distance(&segment_pos, &capsule_1, &segment_pos, &capsule_2).unwrap() - 0.025;
+            dis = query::distance(&segment_pos, &capsule_1, &segment_pos, &capsule_2).unwrap() - 0.0;
         }
         // if self.is_ee_link_0 {
         //     println!("{:?} {:?}",self.arm_idx_0, self.arm_idx_1);
@@ -240,10 +240,11 @@ impl ObjectiveTrait for SelfCollision {
 
 
 pub struct EnvCollision {
-    pub arm_idx: usize
+    pub arm_idx: usize,
+    pub collision_start_idx: usize
 }
 impl EnvCollision {
-    pub fn new(arm_idx: usize) -> Self {Self{arm_idx}}
+    pub fn new(arm_idx: usize, collision_start_idx: usize) -> Self {Self{arm_idx, collision_start_idx}}
 }
 impl ObjectiveTrait for EnvCollision {
     fn call(&self, x: &[f64], v: &vars::RelaxedIKVars, frames: &Vec<(Vec<nalgebra::Vector3<f64>>, Vec<nalgebra::UnitQuaternion<f64>>)>) -> f64 {
@@ -257,6 +258,7 @@ impl ObjectiveTrait for EnvCollision {
         
         let mut x_val: f64 = 0.0;
         let link_radius = v.env_collision.link_radius;
+        let link_radius_finger = 0.01;
         let penalty_cutoff: f64 = link_radius * 2.0;
         let a = penalty_cutoff.powi(2);
         // println!("active obs: {:?}",v.env_collision.active_obstacles);
@@ -265,7 +267,7 @@ impl ObjectiveTrait for EnvCollision {
                 let mut sum: f64 = 0.0;
                 let obstacle = v.env_collision.world.objects.get(*handle).unwrap();
                 let last_elem = frames[self.arm_idx].0.len() - 1;
-                for i in 0..last_elem {
+                for i in self.collision_start_idx..last_elem {
                     let start_pt = Point3::from(frames[self.arm_idx].0[i]);
                     let start_quat = frames[self.arm_idx].1[i];
                      // hard coded for ur5
@@ -284,30 +286,31 @@ impl ObjectiveTrait for EnvCollision {
                     let dis = 
                         // hard coded for movo
                         if i == last_elem - 1 {
-                            let ee_direction = end_quat;
-                            let ee_dir_vec = ee_direction * Point3::from(nalgebra::Vector3::new(1.0, 0.0, 0.0));
-                            let capsule_translation = Translation3::from(end_pt - ee_dir_vec * 0.1);
+                            // is last link (e.g. fingers)
 
-                            let initial_direction = Vector3::new(0.0, 1.0, 0.0); // capsule primary axis is y axis
-                            let capsule_rotation = match nalgebra::Rotation3::rotation_between(&initial_direction, &(ee_direction * nalgebra::Vector3::new(1.0, 0.0, 0.0))) {
-                                Some(r) => r,
-                                None => nalgebra::Rotation3::from_euler_angles(0.0, 0.0, 0.0)
-                            };
+                            // let ee_direction = end_quat;
+                            // let ee_dir_vec = ee_direction * Point3::from(nalgebra::Vector3::new(1.0, 0.0, 0.0));
+                            // let capsule_translation = Translation3::from(end_pt - ee_dir_vec * 0.1);
 
-                            let capsule_pos = nalgebra::Isometry3::from_parts(capsule_translation, UnitQuaternion::from_rotation_matrix(&capsule_rotation));
-                            let capsule = shape_nc::Capsule::new(0.10, 0.05);
-                            if self.arm_idx == 0 {
-                                println!("Capsule pos{:?}", capsule_pos);
-                            }
-                            query_nc::distance(obstacle.position(), obstacle.shape().deref(), &capsule_pos, &capsule)
+                            // let initial_direction = Vector3::new(0.0, 1.0, 0.0); // capsule primary axis is y axis
+                            // let capsule_rotation = match nalgebra::Rotation3::rotation_between(&initial_direction, &(ee_direction * nalgebra::Vector3::new(1.0, 0.0, 0.0))) {
+                            //     Some(r) => r,
+                            //     None => nalgebra::Rotation3::from_euler_angles(0.0, 0.0, 0.0)
+                            // };
+
+                            // let capsule_pos = nalgebra::Isometry3::from_parts(capsule_translation, UnitQuaternion::from_rotation_matrix(&capsule_rotation));
+                            // let capsule = shape_nc::Capsule::new(0.10, 0.05);
+                            // query_nc::distance(obstacle.position(), obstacle.shape().deref(), &capsule_pos, &capsule)
+                            query_nc::distance(obstacle.position(), obstacle.shape().deref(), &segment_pos, &segment) - link_radius_finger
                         } else {
+                            // regular links
                             query_nc::distance(obstacle.position(), obstacle.shape().deref(), &segment_pos, &segment) - link_radius
                         };
 
-                        if i == last_elem - 1 && self.arm_idx == 0 {
-                            println!("dis: {:?}",dis);
+                        // if i == last_elem - 1 && self.arm_idx == 0 {
+                        //     println!("dis: {:?}",dis);
 
-                        }
+                        // }
 
                     // println!("Obstacle: {}, Link: {}, Distance: {:?}", obstacle.data().name, i, dis);
                     sum += a / (dis + link_radius).powi(2);
@@ -439,14 +442,15 @@ impl ObjectiveTrait for MinimizeJerk {
 
 
 pub struct MatchEEPosGoals {
-    pub arm_idx: usize
+    pub arm_idx: usize,
+    pub chain_idx_offset: usize
 }
 impl MatchEEPosGoals {
-    pub fn new(arm_idx: usize) -> Self {Self{arm_idx}}
+    pub fn new(arm_idx: usize, chain_idx_offset: usize) -> Self {Self{arm_idx, chain_idx_offset}}
 }
 impl ObjectiveTrait for MatchEEPosGoals {
     fn call(&self, x: &[f64], v: &vars::RelaxedIKVars, frames: &Vec<(Vec<nalgebra::Vector3<f64>>, Vec<nalgebra::UnitQuaternion<f64>>)>) -> f64 {
-        let last_elem = frames[self.arm_idx].0.len() - 1;
+        let last_elem = frames[self.arm_idx].0.len() - 1 - self.chain_idx_offset;
         let x_val = ( frames[self.arm_idx].0[last_elem] - v.goal_positions[self.arm_idx] ).norm();
 
         groove_loss(x_val, 0., 2, 0.1, 10.0, 2)
@@ -460,14 +464,15 @@ impl ObjectiveTrait for MatchEEPosGoals {
 
 
 pub struct MatchEEQuatGoals {
-    pub arm_idx: usize
+    pub arm_idx: usize,
+    pub chain_idx_offset: usize
 }
 impl MatchEEQuatGoals {
-    pub fn new(arm_idx: usize) -> Self {Self{arm_idx}}
+    pub fn new(arm_idx: usize, chain_idx_offset: usize) -> Self {Self{arm_idx, chain_idx_offset}}
 }
 impl ObjectiveTrait for MatchEEQuatGoals {
     fn call(&self, x: &[f64], v: &vars::RelaxedIKVars, frames: &Vec<(Vec<nalgebra::Vector3<f64>>, Vec<nalgebra::UnitQuaternion<f64>>)>) -> f64 {
-        let last_elem = frames[self.arm_idx].1.len() - 1;
+        let last_elem = frames[self.arm_idx].1.len() - 1 - self.chain_idx_offset;
         let tmp = Quaternion::new(-frames[self.arm_idx].1[last_elem].w, -frames[self.arm_idx].1[last_elem].i, -frames[self.arm_idx].1[last_elem].j, -frames[self.arm_idx].1[last_elem].k);
         let ee_quat2 = UnitQuaternion::from_quaternion(tmp);
 

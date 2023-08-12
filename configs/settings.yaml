@@ -3,13 +3,37 @@ link_radius: 0.05
 base_links:
   - base_link
   - base_link
+  - base_link
+  - base_link
+  - base_link
+  - base_link
+  - base_link
+  - base_link
+
 ee_links:
   - right_ee_link
+  - right_gripper_finger1_finger_tip_link
+  - right_gripper_finger2_finger_tip_link
+  - right_gripper_finger3_finger_tip_link
   - left_ee_link
+  - left_gripper_finger1_finger_tip_link
+  - left_gripper_finger2_finger_tip_link
+  - left_gripper_finger3_finger_tip_link
 
-starting_config:   [0.35, -1.5, -0.2, -0.0, -2.0, 2.0, -1.2354, -1.1, 1.5, 0.2, 0.0, 2.0, -2.0, 1.2354, 1.1]
 
-chains_def: [[0,1,2,3,4,5,6,7],[0,8,9,10,11,12,13,14]]
+
+# starting_config:   [0.35, -1.5, -0.2, -0.0, -2.0, 2.0, -1.2354, -1.1]
+
+# chains_def: [[0,1,2,3,4,5,6,7,8],[0,1,2,3,4,5,6,7,9],[0,1,2,3,4,5,6,7,10]]
+starting_config:      [0.35, -1.5, -0.2, -0.0, -2.0, 2.0, -1.2354, -1.1,  0.9, 0.9, 0.9,    1.5, 0.2, 0.0, 2.0, -2.0, 1.2354, 1.1,  0.9, 0.9, 0.9,]
+enforce_joint_angles: [-10.0,-10.0,-10.0,-10.0,-10.0,-10.0,-10.0,  -10.0, 0.9, 0.9, 0.9,    -10.0,-10.0,-10.0,-10.0,-10.0,-10.0,-10.0,  -10.0, 0.9, 0.9, 0.9,]
+
+chains_def: [[0,1,2,3,4,5,6,7], [0,1,2,3,4,5,6,7,8],[0,1,2,3,4,5,6,7,9],[0,1,2,3,4,5,6,7,10],
+             [0,11,12,13,14,15,16,17],[0,11,12,13,14,15,16,17,18],[0,11,12,13,14,15,16,17,19],[0,11,12,13,14,15,16,17,20]]
+
+is_active_chain: [true, false, false, false, true, false, false, false]
+arm_group:       [1,1,1,1,2,2,2,2]
+num_links_ee_to_tip: 0
 
 # Add Environment Obstacles
 obstacles:
@@ -31,4 +55,4 @@ obstacles:
 # For trajectory tracing
 # traj_files: [traject_6d_5_right.npy, traject_6d_5_left.npy]
 
-traj_files: [traject_6d_1.npy]
+# traj_files: [traject_6d_1.npy]

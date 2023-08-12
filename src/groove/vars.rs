@@ -1,5 +1,6 @@
 use nalgebra::{UnitQuaternion, Vector3, Vector6, Quaternion, Point3};
 use std::f64::consts::PI;
+use std::collections::BTreeSet;
 use crate::spacetime::robot::Robot;
 use crate::utils_rust::file_utils::{*};
 use crate::utils_rust::yaml_utils::{*};
@@ -22,7 +23,14 @@ pub struct VarsConstructorData {
     pub link_radius:f64,
     pub base_links: Vec<String>,
     pub ee_links: Vec<String>,
-    starting_config: Vec<f64>
+    pub starting_config: Vec<f64>,
+    // below are here just for compatibility, may not be implemented properly
+    pub chains_def: Vec<Vec<i64>>,
+    pub is_active_chain: Vec<bool>,
+    pub arm_group: Vec<usize>,
+    pub num_links_ee_to_tip: i64,
+    pub collision_starting_indices: Vec<usize>,
+    ////
 }
 
 pub struct RelaxedIKVars {
@@ -38,6 +46,11 @@ pub struct RelaxedIKVars {
     pub init_ee_positions: Vec<Vector3<f64>>,
     pub init_ee_quats: Vec<UnitQuaternion<f64>>,
     pub env_collision: RelaxedIKEnvCollision,
+    pub chains_def: Vec<Vec<i64>>,
+    pub is_active_chain: Vec<bool>,
+    pub arm_group: Vec<usize>,
+    pub collision_starting_indices: Vec<usize>,
+    pub num_links_ee_to_tip: i64,
 }
 impl RelaxedIKVars {
     pub fn from_local_settings(path_to_setting: &str) -> Self {
@@ -55,9 +68,13 @@ impl RelaxedIKVars {
         let base_links_arr = settings["base_links"].as_vec().unwrap();
         let ee_links_arr = settings["ee_links"].as_vec().unwrap();
         let chains_def_arr = settings["chains_def"].as_vec().unwrap();
-        
-        let num_chains = base_links_arr.len();
+        let is_active_chain_arr = settings["is_active_chain"].as_vec().unwrap();
+        let num_links_ee_to_tip = settings["num_links_ee_to_tip"].as_i64().unwrap();
+        let enforce_ja_arr = settings["enforce_joint_angles"].as_vec().unwrap();
+        let arm_group_arr = settings["arm_group"].as_vec().unwrap();
 
+        let num_chains = base_links_arr.len();
+        
         let mut base_links = Vec::new();
         let mut ee_links = Vec::new();
         let mut tolerances: Vec<Vector6<f64>> = Vec::new();
@@ -74,9 +91,40 @@ impl RelaxedIKVars {
             }).collect()
         }).collect();
 
+        let is_active_chain: Vec<bool> = is_active_chain_arr.iter().map(|item| {item.as_bool().unwrap()}).collect();
+        let arm_group: Vec<usize> = arm_group_arr.iter().map(|item| {item.as_i64().unwrap() as usize}).collect();
+        let enforce_ja: Vec<f64> = enforce_ja_arr.iter().map(|item| {item.as_f64().unwrap()}).collect();
+        // calculate the index of link where collision needs to start of each chain
+        let mut collision_starting_indices: Vec<usize> = Vec::new();
+        let mut link_considered_in_collision: BTreeSet<i64> = BTreeSet::new();
+        for i in 0..num_chains {
+            let mut c_idx: i64 = -1;
+            for (j, k) in chains_def[i].iter().enumerate() {
+                if !link_considered_in_collision.contains(k) {
+                    link_considered_in_collision.insert(*k);
+                    if c_idx == -1 {
+                        c_idx = j as i64; 
+                    };
+                }
+            }
+            if c_idx != -1 {
+                collision_starting_indices.push(c_idx as usize);  
+            } 
+        }
+
 
         let urdf = &std::fs::read_to_string(path_to_urdf).unwrap();
-        let robot = Robot::from_urdf(urdf, &base_links, &ee_links, Some(&chains_def));
+        let mut robot = Robot::from_urdf(urdf, &base_links, &ee_links, &chains_def);
+
+        // enforce joint angles by modifying joint limits
+        let eps: f64 = 0.001;
+        for i in 0..robot.num_dofs {
+            if enforce_ja[i] > -PI && enforce_ja[i] < PI {
+                robot.lower_joint_limits[i] = enforce_ja[i] - eps;
+                robot.upper_joint_limits[i] = enforce_ja[i] + eps;
+            } 
+        }
+
         println!("num_dofs:{:?}",robot.num_dofs);
         let mut starting_config = Vec::new();
         if settings["starting_config"].is_badvalue() {
@@ -108,7 +156,8 @@ impl RelaxedIKVars {
 
         RelaxedIKVars{robot, init_state: starting_config.clone(), xopt: starting_config.clone(),
             prev_state: starting_config.clone(), prev_state2: starting_config.clone(), prev_state3: starting_config.clone(),
-            goal_positions: init_ee_positions.clone(), goal_quats: init_ee_quats.clone(), tolerances, init_ee_positions, init_ee_quats, env_collision:env_collision}
+            goal_positions: init_ee_positions.clone(), goal_quats: init_ee_quats.clone(), tolerances, init_ee_positions, init_ee_quats, env_collision:env_collision,
+            chains_def, is_active_chain, arm_group, collision_starting_indices, num_links_ee_to_tip}
     }
     
     // for webassembly
@@ -121,7 +170,7 @@ impl RelaxedIKVars {
             tolerances.push(Vector6::new(0., 0., 0., 0., 0., 0.));
         }
 
-        let robot = Robot::from_urdf(urdf, &configs.base_links, &configs.ee_links, None);
+        let robot = Robot::from_urdf(urdf, &configs.base_links, &configs.ee_links, &configs.chains_def);
 
         let mut init_ee_positions: Vec<Vector3<f64>> = Vec::new();
         let mut init_ee_quats: Vec<UnitQuaternion<f64>> = Vec::new();
@@ -137,9 +186,12 @@ impl RelaxedIKVars {
         let frames = robot.get_frames_immutable(&configs.starting_config.clone());
         let env_collision = RelaxedIKEnvCollision::init_collision_world(env_collision_file, &frames);
 
+
+
         RelaxedIKVars{robot, init_state: configs.starting_config.clone(), xopt: configs.starting_config.clone(),
             prev_state: configs.starting_config.clone(), prev_state2: configs.starting_config.clone(), prev_state3: configs.starting_config.clone(),
-            goal_positions: init_ee_positions.clone(), goal_quats: init_ee_quats.clone(), tolerances, init_ee_positions, init_ee_quats, env_collision:env_collision}
+            goal_positions: init_ee_positions.clone(), goal_quats: init_ee_quats.clone(), tolerances, init_ee_positions, init_ee_quats, env_collision:env_collision,
+            chains_def:configs.chains_def.clone(), is_active_chain:configs.is_active_chain.clone(), arm_group: configs.arm_group.clone(), collision_starting_indices:configs.collision_starting_indices.clone(), num_links_ee_to_tip: configs.num_links_ee_to_tip.clone()}
 
     }
 
@@ -239,6 +291,7 @@ impl RelaxedIKVars {
         self.env_collision.world.update();
 
         let link_radius = self.env_collision.link_radius;
+        let link_radius_finger = 0.01;
         let penalty_cutoff: f64 = link_radius * 2.0;
         let a = penalty_cutoff.powi(2);
         let filter_cutoff = 3;
@@ -257,18 +310,19 @@ impl RelaxedIKVars {
                     let segment_pos = nalgebra::one();
                     let dis = if j == last_elem - 1 {
                          // hard coded for movo
-                        let ee_direction = frames[arm_idx].1[j+1];
-                        let ee_dir_vec = ee_direction * Point3::from(nalgebra::Vector3::new(1.0, 0.0, 0.0));
-                        let capsule_translation = nalgebra::Translation3::from(end_pt - ee_dir_vec * 0.1);
-                        let initial_direction = Vector3::new(0.0, 1.0, 0.0); // capsule primary axis is y axis
-                        let capsule_rotation = match nalgebra::Rotation3::rotation_between(&initial_direction, &(ee_direction * nalgebra::Vector3::new(1.0, 0.0, 0.0))) {
-                            Some(r) => r,
-                            None => nalgebra::Rotation3::from_euler_angles(0.0, 0.0, 0.0)
-                        };
-                        let capsule_pos = nalgebra::Isometry3::from_parts(capsule_translation, UnitQuaternion::from_rotation_matrix(&capsule_rotation));
-                        let capsule = Capsule::new(0.10, 0.05);
+                        // let ee_direction = frames[arm_idx].1[j+1];
+                        // let ee_dir_vec = ee_direction * Point3::from(nalgebra::Vector3::new(1.0, 0.0, 0.0));
+                        // let capsule_translation = nalgebra::Translation3::from(end_pt - ee_dir_vec * 0.1);
+                        // let initial_direction = Vector3::new(0.0, 1.0, 0.0); // capsule primary axis is y axis
+                        // let capsule_rotation = match nalgebra::Rotation3::rotation_between(&initial_direction, &(ee_direction * nalgebra::Vector3::new(1.0, 0.0, 0.0))) {
+                        //     Some(r) => r,
+                        //     None => nalgebra::Rotation3::from_euler_angles(0.0, 0.0, 0.0)
+                        // };
+                        // let capsule_pos = nalgebra::Isometry3::from_parts(capsule_translation, UnitQuaternion::from_rotation_matrix(&capsule_rotation));
+                        // let capsule = Capsule::new(0.10, 0.05);
 
-                        distance(obstacle.position(), obstacle.shape().deref(), &capsule_pos, &capsule)
+                        // distance(obstacle.position(), obstacle.shape().deref(), &capsule_pos, &capsule)
+                        distance(obstacle.position(), obstacle.shape().deref(), &segment_pos, &segment) - link_radius_finger
                     }
                     else { 
                         distance(obstacle.position(), obstacle.shape().deref(), &segment_pos, &segment) - link_radius 

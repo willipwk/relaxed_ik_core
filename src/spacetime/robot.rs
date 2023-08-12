@@ -14,7 +14,7 @@ pub struct Robot {
 }
 
 impl Robot {
-    pub fn from_urdf(urdf: &str, base_links: &[String], ee_links: &[String], chains_def: Option<&Vec<Vec<i64>>>) -> Self {
+    pub fn from_urdf(urdf: &str, base_links: &[String], ee_links: &[String], chains_def: &Vec<Vec<i64>>) -> Self {
         
         // let chain = k::Chain::<f64>::from_urdf_file(urdf_fp).unwrap();
         let description : urdf_rs::Robot = urdf_rs::read_from_string(urdf).unwrap();
@@ -28,7 +28,7 @@ impl Robot {
 
         let mut lower_joint_limits = Vec::new();
         let mut upper_joint_limits = Vec::new();
-        println!("chains_def: {:?}",chains_def.unwrap());
+        println!("chains_def: {:?}",chains_def);
 
         for i in 0..num_chains {
             let base_link = chain.find_link(base_links[i].as_str()).unwrap();
@@ -43,13 +43,16 @@ impl Robot {
             let mut displacements = Vec::new();
             let mut rot_offsets = Vec::new();
             let mut num_links_inbetween: usize = 0;
+            let mut link_names: Vec<String> = Vec::new();
             serial_chain.iter().for_each(|node| {
                 let link = node.link();
                 let link_name = link.as_ref().unwrap().clone().name;
                 // println!("link: {:?}",link_name);
                 if link_name != base_link_name && link_name != ee_link_name {
+                 
                     num_links_inbetween += 1;
                 }
+                link_names.push(link_name);
             });
             
 
@@ -109,6 +112,7 @@ impl Robot {
             // chain_lengths.push(axis_types.len() as usize);
             chain_lengths.push(num_links_inbetween);
             // num_dofs += axis_types.len();
+            println!("Link names of arm {}: {:?}", i, link_names)
         }
         num_dofs = articulated_joint_names.len();
         println!("axis types: {:?}", arms[0].axis_types);
@@ -117,7 +121,7 @@ impl Robot {
         println!("lower_joint_limits: {:?}",lower_joint_limits);
         println!("upper_joint_limits: {:?}",upper_joint_limits);
         println!("chain_lengths: {:?}", chain_lengths);
-        Robot{arms, num_chains, num_dofs, chain_lengths, chains_def: chains_def.unwrap().clone(), lower_joint_limits, upper_joint_limits}
+        Robot{arms, num_chains, num_dofs, chain_lengths, chains_def: chains_def.clone(), lower_joint_limits, upper_joint_limits}
 
     }
     

@@ -67,15 +67,16 @@ pub unsafe extern "C" fn solve_position(ptr: *mut RelaxedIK, pos_goals: *const c
     assert!(!quat_goals.is_null(), "Null pointer for quat goals!");
     assert!(!tolerance.is_null(), "Null pointer for tolerance!"); 
 
-    assert!(pos_length as usize == relaxed_ik.vars.robot.num_chains * 3 , 
+    let num_active_chains: usize = relaxed_ik.vars.is_active_chain.iter().map(|x| {*x as usize}).sum();
+    assert!(pos_length as usize == num_active_chains * 3 , 
         "Pos vels are expected to have {} numbers, but got {}", 
-        relaxed_ik.vars.robot.num_chains * 3, pos_length);
-    assert!(quat_length as usize == relaxed_ik.vars.robot.num_chains * 4,
+        num_active_chains * 3, pos_length);
+    assert!(quat_length as usize == num_active_chains * 4,
         "Rot vels are expected to have {} numbers, but got {}", 
-        relaxed_ik.vars.robot.num_chains * 4, quat_length);
-    assert!(tolerance_length as usize == relaxed_ik.vars.robot.num_chains * 6, 
+        num_active_chains * 4, quat_length);
+    assert!(tolerance_length as usize == num_active_chains * 6, 
         "Tolerance are expected to have {} numbers, but got {}", 
-        relaxed_ik.vars.robot.num_chains * 6, tolerance_length);
+        num_active_chains * 6, tolerance_length);
 
     let pos_slice: &[c_double] = std::slice::from_raw_parts(pos_goals, pos_length as usize);
     let quat_slice: &[c_double] = std::slice::from_raw_parts(quat_goals, quat_length as usize);
@@ -107,16 +108,16 @@ pub unsafe extern "C" fn solve_velocity(ptr: *mut RelaxedIK, pos_vels: *const c_
     assert!(!pos_vels.is_null(), "Null pointer for pos vels!");
     assert!(!rot_vels.is_null(), "Null pointer for rot vels!");
     assert!(!tolerance.is_null(), "Null pointer for tolerance!"); 
-
-    assert!(pos_length as usize == relaxed_ik.vars.robot.num_chains * 3 , 
+    let num_active_chains: usize = relaxed_ik.vars.is_active_chain.iter().map(|x| {*x as usize}).sum();
+    assert!(pos_length as usize == num_active_chains * 3 , 
         "Pos vels are expected to have {} numbers, but got {}", 
-        relaxed_ik.vars.robot.num_chains * 3, pos_length);
-    assert!(rot_length as usize == relaxed_ik.vars.robot.num_chains * 3,
+        num_active_chains * 3, pos_length);
+    assert!(rot_length as usize == num_active_chains * 3,
         "Rot vels are expected to have {} numbers, but got {}", 
-        relaxed_ik.vars.robot.num_chains * 3, rot_length);
-    assert!(tolerance_length as usize == relaxed_ik.vars.robot.num_chains * 6, 
+        num_active_chains * 3, rot_length);
+    assert!(tolerance_length as usize == num_active_chains * 6, 
         "Tolerance are expected to have {} numbers, but got {}", 
-        relaxed_ik.vars.robot.num_chains * 6, tolerance_length);
+        num_active_chains * 6, tolerance_length);
 
     let pos_slice: &[c_double] = std::slice::from_raw_parts(pos_vels, pos_length as usize);
     let rot_slice: &[c_double] = std::slice::from_raw_parts(rot_vels, rot_length as usize);
@@ -175,7 +176,6 @@ pub unsafe extern "C" fn solve(ptr: *mut RelaxedIK, pos_goals: *const c_double, 
     let pos_vec = pos_slice.to_vec();
     let quat_vec = quat_slice.to_vec();
     let tolerance_vec = tolerance_slice.to_vec();
-
     let ja = solve_position_helper(relaxed_ik, pos_vec, quat_vec, tolerance_vec);
 
     let ptr = ja.as_ptr();
@@ -186,13 +186,17 @@ pub unsafe extern "C" fn solve(ptr: *mut RelaxedIK, pos_goals: *const c_double, 
 
 fn solve_position_helper(relaxed_ik: &mut RelaxedIK, pos_goals: Vec<f64>, quat_goals: Vec<f64>,
                 tolerance: Vec<f64>) -> Vec<f64> {
-
+    let mut j: usize = 0;
     for i in 0..relaxed_ik.vars.robot.num_chains  {
-        relaxed_ik.vars.goal_positions[i] = Vector3::new(pos_goals[3*i], pos_goals[3*i+1], pos_goals[3*i+2]);
-        let tmp_q = Quaternion::new(quat_goals[4*i+3], quat_goals[4*i], quat_goals[4*i+1], quat_goals[4*i+2]);
-        relaxed_ik.vars.goal_quats[i] =  UnitQuaternion::from_quaternion(tmp_q);
-        relaxed_ik.vars.tolerances[i] = Vector6::new( tolerance[6*i], tolerance[6*i+1], tolerance[6*i+2],
-            tolerance[6*i+3], tolerance[6*i+4], tolerance[6*i+5])
+        if relaxed_ik.vars.is_active_chain[i] {
+            relaxed_ik.vars.goal_positions[i] = Vector3::new(pos_goals[3*j], pos_goals[3*j+1], pos_goals[3*j+2]);
+            let tmp_q = Quaternion::new(quat_goals[4*j+3], quat_goals[4*j], quat_goals[4*j+1], quat_goals[4*j+2]);
+            relaxed_ik.vars.goal_quats[i] =  UnitQuaternion::from_quaternion(tmp_q);
+            relaxed_ik.vars.tolerances[i] = Vector6::new( tolerance[6*j], tolerance[6*j+1], tolerance[6*j+2],
+            tolerance[6*j+3], tolerance[6*j+4], tolerance[6*j+5]);
+
+            j += 1;
+        }
     }
                     
     let x = relaxed_ik.solve();
@@ -202,14 +206,19 @@ fn solve_position_helper(relaxed_ik: &mut RelaxedIK, pos_goals: Vec<f64>, quat_g
 fn solve_velocity_helper(relaxed_ik: &mut RelaxedIK, pos_vels: Vec<f64>, rot_vels: Vec<f64>,
     tolerance: Vec<f64>) -> Vec<f64> {
 
+    let mut j: usize = 0;
     for i in 0..relaxed_ik.vars.robot.num_chains  {
-        relaxed_ik.vars.goal_positions[i] += Vector3::new(pos_vels[3*i], pos_vels[3*i+1], pos_vels[3*i+2]);
-        let axisangle = Vector3::new(rot_vels[3*i], rot_vels[3*i+1], rot_vels[3*i+2]);
-        let tmp_q = UnitQuaternion::from_scaled_axis(axisangle);
-        let org_q = relaxed_ik.vars.goal_quats[i].clone();
-        relaxed_ik.vars.goal_quats[i] =  tmp_q * org_q;
-        relaxed_ik.vars.tolerances[i] = Vector6::new( tolerance[3*i], tolerance[3*i+1], tolerance[3*i+2],
-            tolerance[3*i+3], tolerance[3*i+4], tolerance[3*i+5])
+        if relaxed_ik.vars.is_active_chain[i] {
+            relaxed_ik.vars.goal_positions[i] += Vector3::new(pos_vels[3*j], pos_vels[3*j+1], pos_vels[3*j+2]);
+            let axisangle = Vector3::new(rot_vels[3*j], rot_vels[3*j+1], rot_vels[3*j+2]);
+            let tmp_q = UnitQuaternion::from_scaled_axis(axisangle);
+            let org_q = relaxed_ik.vars.goal_quats[i].clone();
+            relaxed_ik.vars.goal_quats[i] =  tmp_q * org_q;
+            relaxed_ik.vars.tolerances[i] = Vector6::new( tolerance[3*j], tolerance[3*j+1], tolerance[3*j+2],
+                tolerance[3*j+3], tolerance[3*j+4], tolerance[3*j+5]);
+
+            j += 1;
+        }
     }
 
     let x = relaxed_ik.solve();
