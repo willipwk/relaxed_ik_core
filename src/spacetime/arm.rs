@@ -266,7 +266,7 @@ impl Arm{
                 } else if self.__is_neg_z[joint_idx] {
                     p_axis = joint_rot_quats[i] * neg_z
                 } 
-
+                
                 let linear = p_axis.cross(&disp);
                 jacobian.set_column(joint_idx, & Vector6::new( linear.x, linear.y, linear.z,
                                                                     p_axis.x, p_axis.y, p_axis.z ));
@@ -279,6 +279,10 @@ impl Arm{
 
     pub fn get_manipulability_immutable(&self, x: &[f64]) -> f64 {
         let jacobian = self.get_jacobian_immutable(x);
+        let jjtd = (jacobian.clone() * jacobian.transpose()).determinant();
+        if jjtd < 1e-7 {
+            return 0.0;
+        }
         (jacobian.clone() * jacobian.transpose()).determinant().sqrt()
     }
 

@@ -1,0 +1,21 @@
+urdf: allegro_hand.urdf
+link_radius: 0.05 
+base_links:
+  - world
+  - world
+ee_links:
+  - link_3.0_tip
+  - link_15.0_tip
+
+
+# starting_config:   [0.35, -1.5, -0.2, -0.0, -2.0, 2.0, -1.2354, -1.1, 1.5, 0.2, 0.0, 2.0, -2.0, 1.2354, 1.1]
+starting_config:   [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
+# starting_config:   [0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+chains_def: [[0,1,2,3],[4,5,6,7]]
+
+
+# For trajectory tracing
+# traj_files: [traject_6d_5_right.npy, traject_6d_5_left.npy]
+
+# traj_files: [traject_6d_1.npy]

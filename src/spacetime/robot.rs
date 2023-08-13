@@ -166,7 +166,8 @@ impl Robot {
             // r += self.chain_lengths[i];
             let ja_vec = self.split_joint_angles(x, i);
             // out += self.arms[i].get_manipulability_immutable( &x[l..r] );
-            out += self.arms[i].get_manipulability_immutable(&ja_vec[0..ja_vec.len()]);
+            let yoshikawa = self.arms[i].get_manipulability_immutable(&ja_vec[0..ja_vec.len()]);
+            out += yoshikawa;
             // l = r;
         }
         out
