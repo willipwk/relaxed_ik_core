@@ -15,7 +15,7 @@ pub struct Opt {
 pub struct RelaxedIK {
     pub vars: RelaxedIKVars,
     pub om: ObjectiveMaster,
-    pub groove: OptimizationEngineOpen
+    pub groove: OptimizationEngineOpen,
 }
 
 impl RelaxedIK {
@@ -36,12 +36,15 @@ impl RelaxedIK {
                                                               vars.num_links_ee_to_tip);
 
         let groove = OptimizationEngineOpen::new(vars.robot.num_dofs.clone());
-
+        
         Self{vars, om, groove}
     }
 
     pub fn reset(&mut self, x: Vec<f64>) {
         self.vars.reset( x.clone());
+        let frames = self.vars.robot.get_frames_immutable(&x.clone());
+        self.vars.env_collision.reset(&frames);
+        self.vars.update_collision_world();
     }
 
     pub fn solve(&mut self) -> Vec<f64> {

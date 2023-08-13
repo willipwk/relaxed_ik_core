@@ -182,4 +182,20 @@ impl RelaxedIKEnvCollision {
             }
         }
     }
+    pub fn reset(&mut self, 
+        frames: &Vec<(Vec<nalgebra::Vector3<f64>>, Vec<nalgebra::UnitQuaternion<f64>>)>) {
+        self.active_pairs.clear();
+        self.active_obstacles.clear();
+
+        for arm_idx in 0..frames.len() {
+            let mut obstacles: Vec<(Option<CollisionObjectSlabHandle>, f64)> = Vec::new();
+            let pair: BTreeMap<CollisionObjectSlabHandle, Vec<CollisionObjectSlabHandle>> = BTreeMap::new();
+            let last_elem = frames[arm_idx].0.len() - 1;
+            for i in 0..last_elem {
+                obstacles.push((None, 0.0));
+            }
+            self.active_pairs.push(pair);
+            self.active_obstacles.push(obstacles);
+        }
+    }
 }

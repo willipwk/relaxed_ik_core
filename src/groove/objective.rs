@@ -336,9 +336,10 @@ impl ObjectiveTrait for EnvCollision {
 pub struct MaximizeManipulability;
 impl ObjectiveTrait for MaximizeManipulability {
     fn call(&self, x: &[f64], v: &vars::RelaxedIKVars, frames: &Vec<(Vec<nalgebra::Vector3<f64>>, Vec<nalgebra::UnitQuaternion<f64>>)>) -> f64 {
-        let x_val = v.robot.get_manipulability_immutable(&x);
+        let mut x_val = v.robot.get_manipulability_immutable(&x);
         if x_val.is_nan() {
-            eprintln!("Manipulability is nan!");
+            // eprintln!("Manipulability is nan!");
+            x_val = 10.0;
         }
         groove_loss(x_val, 1.0, 2, 0.5, 0.1, 2)
     }

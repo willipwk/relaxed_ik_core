@@ -96,7 +96,7 @@ pub unsafe extern "C" fn solve_position(ptr: *mut RelaxedIK, pos_goals: *const c
     std::mem::forget(ja);
 
     let elapsed = start.elapsed();
-    println!("Rust time: {:?} ms", elapsed.as_millis());
+    // println!("Rust time: {:?} ms", elapsed.as_millis());
 
 
     Opt {data: ptr, length: len as c_int}

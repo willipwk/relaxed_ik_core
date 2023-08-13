@@ -92,9 +92,6 @@ impl ObjectiveMaster {
                     let link_name_1 = arm_link_names[i][j].clone();
                     let link_name_2 = arm_link_names[i][k].clone();
                     let link_pair = if link_name_1 < link_name_2 {(link_name_1, link_name_2)} else {(link_name_2, link_name_1)};
-                    if collisions.contains(&link_pair) {
-                        println!("Dup1! {:?}",link_pair);
-                    }
                     if disabled_collisions.contains(&link_pair) || collisions.contains(&link_pair){
                         continue;
                     }
@@ -117,9 +114,6 @@ impl ObjectiveMaster {
                         let link_name_1 = arm_link_names[a1][i].clone();
                         let link_name_2 = arm_link_names[a2][j].clone();
                         let link_pair = if link_name_1 < link_name_2 {(link_name_1, link_name_2)} else {(link_name_2, link_name_1)};
-                        if collisions.contains(&link_pair) {
-                            println!("Dup2! {:?}",link_pair);
-                        }
                         if disabled_collisions.contains(&link_pair) || collisions.contains(&link_pair){
                             continue;
                         }

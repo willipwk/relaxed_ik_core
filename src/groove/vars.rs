@@ -88,9 +88,6 @@ impl RelaxedIKVars {
 
         let srdf_file =  fs::read_to_string(path_to_srdf).unwrap();
         let srdf_robot: SRDFRobot = serde_xml_rs::from_str(&srdf_file).unwrap();    
-        for collision in &srdf_robot.disable_collisions {
-            println!("{:?}", *collision);
-        }
 
         let chain = k::Chain::<f64>::from_urdf_file(path_to_urdf.clone()).unwrap();
 
@@ -250,6 +247,10 @@ impl RelaxedIKVars {
 
         self.init_ee_positions = init_ee_positions.clone();
         self.init_ee_quats = init_ee_quats.clone();
+        // self.update_collision_world();
+        println!("core: reset -> {:?}", init_state);
+        println!("self.init_ee_positions: {:?}",self.init_ee_positions);
+        println!("self.init_ee_quats: {:?}",self.init_ee_quats);
     }
 
 
