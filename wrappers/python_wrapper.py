@@ -28,7 +28,7 @@ lib.solve_velocity.restype = Opt
 lib.reset.argtypes = [ctypes.POINTER(RelaxedIKS), ctypes.POINTER(ctypes.c_double), ctypes.c_int]
 lib.reset.restype = None
 lib.get_jointstate_loss.argtypes = [ctypes.POINTER(RelaxedIKS)]
-lib.get_jointstate_loss.restype = ctypes.c_double
+lib.get_jointstate_loss.restype = Opt
 lib.get_objective_weight_names.argtypes = [ctypes.POINTER(RelaxedIKS)]
 lib.get_objective_weight_names.restype = ctypes.POINTER(StringArray)
 
@@ -101,7 +101,8 @@ class RelaxedIKRust:
         js_arr = (ctypes.c_double * len(joint_state))()
         for i in range(len(joint_state)):
             js_arr[i] = joint_state[i]
-        return lib.get_jointstate_loss(self.obj, js_arr, len(js_arr))
+        losses = lib.get_jointstate_loss(self.obj, js_arr, len(js_arr))
+        return losses.data[:losses.length]
         
     def dynamic_obstacle_cb(self, marker_name: str, pose):
         pos_arr = (ctypes.c_double * 3)()

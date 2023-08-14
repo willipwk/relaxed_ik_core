@@ -72,7 +72,7 @@ impl RelaxedIK {
         out_x
     }
 
-    pub fn get_jointstate_loss(&mut self, x: Vec<f64>) -> f64 {
-        self.om.call(&x[..], &self.vars)
+    pub fn get_jointstate_loss(&mut self, x: Vec<f64>) -> Vec<f64> {
+        self.om.get_losses(&x[..], &self.vars)
     }
 }

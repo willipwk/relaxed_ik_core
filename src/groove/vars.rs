@@ -249,8 +249,8 @@ impl RelaxedIKVars {
         self.init_ee_quats = init_ee_quats.clone();
         // self.update_collision_world();
         println!("core: reset -> {:?}", init_state);
-        println!("self.init_ee_positions: {:?}",self.init_ee_positions);
-        println!("self.init_ee_quats: {:?}",self.init_ee_quats);
+        // println!("self.init_ee_positions: {:?}",self.init_ee_positions);
+        // println!("self.init_ee_quats: {:?}",self.init_ee_quats);
     }
 
 

@@ -307,10 +307,9 @@ impl ObjectiveTrait for EnvCollision {
                             query_nc::distance(obstacle.position(), obstacle.shape().deref(), &segment_pos, &segment) - link_radius
                         };
 
-                        // if i == last_elem - 1 && self.arm_idx == 0 {
-                        //     println!("dis: {:?}",dis);
-
-                        // }
+                        if i == last_elem - 1 && self.arm_idx == 0 {
+                            println!("dis_right_fingers: {:?}",dis);
+                        }
 
                     // println!("Obstacle: {}, Link: {}, Distance: {:?}", obstacle.data().name, i, dis);
                     sum += a / (dis + link_radius).powi(2);

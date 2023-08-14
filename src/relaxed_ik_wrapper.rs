@@ -43,7 +43,7 @@ pub unsafe extern "C" fn reset(ptr: *mut RelaxedIK, joint_state: *const c_double
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn get_jointstate_loss(ptr: *mut RelaxedIK, joint_state: *const c_double, joint_state_length: c_int) -> f64 {
+pub unsafe extern "C" fn get_jointstate_loss(ptr: *mut RelaxedIK, joint_state: *const c_double, joint_state_length: c_int) -> Opt {
     let relaxed_ik = unsafe {
         assert!(!ptr.is_null());
         &mut *ptr
@@ -51,7 +51,12 @@ pub unsafe extern "C" fn get_jointstate_loss(ptr: *mut RelaxedIK, joint_state: *
 
     let x_slice: &[c_double] = std::slice::from_raw_parts(joint_state, joint_state_length as usize);
     let x_vec = x_slice.to_vec();
-    relaxed_ik.get_jointstate_loss(x_vec)
+    let losses = relaxed_ik.get_jointstate_loss(x_vec);
+
+    let ptr = losses.as_ptr();
+    let len = losses.len() as c_int;
+    std::mem::forget(losses);
+    Opt { data: ptr, length: len }
 }
 
 #[no_mangle]
@@ -79,7 +84,7 @@ pub unsafe extern "C" fn solve_position(ptr: *mut RelaxedIK, pos_goals: *const c
         "Tolerance are expected to have {} numbers, but got {}", 
         num_active_chains * 6, tolerance_length);
     
-    let start = Instant::now();
+    // let start = Instant::now();
     
     let pos_slice: &[c_double] = std::slice::from_raw_parts(pos_goals, pos_length as usize);
     let quat_slice: &[c_double] = std::slice::from_raw_parts(quat_goals, quat_length as usize);
@@ -95,7 +100,7 @@ pub unsafe extern "C" fn solve_position(ptr: *mut RelaxedIK, pos_goals: *const c
     let len = ja.len();
     std::mem::forget(ja);
 
-    let elapsed = start.elapsed();
+    // let elapsed = start.elapsed();
     // println!("Rust time: {:?} ms", elapsed.as_millis());
 
 

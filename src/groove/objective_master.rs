@@ -36,7 +36,7 @@ impl ObjectiveMaster {
         println!("collision_starting_indices: {:?}",collision_starting_indices);
         println!("chain_lengths: {:?}", chain_lengths);
         println!("arm_group: {:?}", arm_group);
-        println!("disabled_collisions: {:?}", disabled_collisions);
+        // println!("disabled_collisions: {:?}", disabled_collisions);
         for i in 0..num_chains {
             if is_active_chain[i] {
                 // objectives.push(Box::new(MatchEEPosiDoF::new(i, 0)));
@@ -179,7 +179,6 @@ impl ObjectiveMaster {
         let mut temp: Vec<f64> = Vec::new();
         for i in 0..self.objectives.len() {
             let l = self.weight_priors[i] * self.objectives[i].call(x, vars, &frames);
-            temp.push(l);
             out += l;
         }
         // println!("temp: {:?}", temp);
@@ -193,6 +192,17 @@ impl ObjectiveMaster {
             out += self.weight_priors[i] * self.objectives[i].call_lite(x, vars, &poses);
         }
         out
+    }
+
+    pub fn get_losses(&self, x: &[f64], vars: &RelaxedIKVars) -> Vec<f64> {
+        let mut out = 0.0;
+        let frames = vars.robot.get_frames_immutable(x);
+        let mut losses: Vec<f64> = Vec::new();
+        for i in 0..self.objectives.len() {
+            let l = self.weight_priors[i] * self.objectives[i].call(x, vars, &frames);
+            losses.push(l);
+        }
+        losses
     }
 
     fn __gradient(&self, x: &[f64], vars: &RelaxedIKVars) -> (f64, Vec<f64>) {
